@@ -1,0 +1,42 @@
+version: '3.7'
+
+volumes:
+  code:
+
+services:
+
+  app:
+    image: ngyuki/php-dev
+    init: true
+    working_dir: /code
+    volumes:
+      - code:/code:rw
+    environment:
+      XDEBUG_MODE: develop,debug
+      XDEBUG_CONFIG: client_host=host.docker.internal discover_client_host=0
+    command:
+      - php
+      - -S
+      - 0.0.0.0:9876
+      - -dzend_extension=xdebug.so
+
+  somux:
+    image: ngyuki/somux
+    init: true
+    networks:
+      default:
+        aliases:
+          - host.docker.internal
+    command:
+      - tail
+      - -f
+      - /dev/null
+
+  unison:
+    image: eugenmayer/unison:2.51.2.2
+    init: true
+    volumes:
+      - code:/code:rw
+    command:
+      - unison
+      - -socket=5000
