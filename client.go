@@ -7,13 +7,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/hashicorp/yamux"
 )
 
-func runClient(logger *Logger, setting *setting) error {
+func runClient(ctx context.Context, logger *Logger, setting *setting) error {
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	cmd, conn, err := startServerProcess(ctx, logger, setting.Command)
@@ -28,18 +29,15 @@ func runClient(logger *Logger, setting *setting) error {
 	}
 	defer session.Close()
 
-	{
-		stream, err := session.OpenStream()
-		if err != nil {
-			return fmt.Errorf("open initial stream: %w", err)
-		}
+	stream, err := session.OpenStream()
+	if err != nil {
+		return fmt.Errorf("open initial stream: %w", err)
+	}
+	defer stream.Close()
 
-		defer stream.Close()
-
-		err = writeGob(stream, setting)
-		if err != nil {
-			return fmt.Errorf("write initial data: %w", err)
-		}
+	err = writeGob(stream, setting)
+	if err != nil {
+		return fmt.Errorf("write initial data: %w", err)
 	}
 
 	for _, v := range setting.LocalForwards {
@@ -101,11 +99,9 @@ func startServerProcess(ctx context.Context, logger *Logger, command []string) (
 	}()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			logger.println("kill server process")
-			cmd.Process.Kill()
-		}
+		<-ctx.Done()
+		logger.println("terminate server process")
+		cmd.Process.Signal(syscall.SIGTERM)
 	}()
 
 	conn := &ReaderWriterMix{r: stdout, w: stdin}

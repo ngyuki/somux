@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -23,12 +26,23 @@ func main() {
 	logger := newLogger()
 	logger.verbose = setting.Verbose
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	go func() {
+		s := <-sig
+		logger.printf("recv signal %v", s)
+		cancel()
+	}()
+
 	if len(setting.Command) > 0 {
 		logger = logger.withName("C")
-		err = runClient(logger, setting)
+		err = runClient(ctx, logger, setting)
 	} else {
 		logger = logger.withName("S")
-		err = runServer(logger)
+		err = runServer(ctx, logger)
 	}
 	if err != nil {
 		logger.errorln(err)
