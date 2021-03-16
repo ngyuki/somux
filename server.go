@@ -19,7 +19,7 @@ func runServer(ctx context.Context, logger *Logger) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	//defer session.Close() // @todo shutdown delayed
 
 	setting := setting{}
 
